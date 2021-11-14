@@ -1,5 +1,6 @@
 # Gesture-Recognition
 This code shall recognize gestures with the help of OpenCV
+
 NOTE: closing openCV windows will just spawn them again. To quit the script, either press 'q' while an openCV window is focussed or kill the process from the terminal
 
 ## Files
