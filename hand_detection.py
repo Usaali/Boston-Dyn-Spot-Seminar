@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import imutils
 import time
+from math import sqrt,pow
 
 def bg_avg(img, bg, weight):
     """ This function takes an image and adds its weight to the averaged background variable
@@ -154,7 +155,26 @@ def isBetween(x1, y1, x2, y2, x3, y3):
 
     return True    
 
-def fingersClosed(frame, landmarks, contour):
+def ptDist(x1, y1, x2, y2):
+    return(sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2)))
+
+def fingersClosedLM(frame,landmarks):
+    h, w = frame.shape[:2]
+    mcpDist = ptDist(int(landmarks[5].x * w), int(landmarks[5].y * h), int(landmarks[17].x * w), int(landmarks[17].y * h))
+    tipDist = ptDist(int(landmarks[8].x * w), int(landmarks[8].y * h), int(landmarks[20].x * w), int(landmarks[20].y * h))
+    threshold = 20
+    if tipDist > mcpDist+threshold:
+        cv2.line(frame,(int(landmarks[5].x * w), int(landmarks[5].y * h)), (int(landmarks[17].x * w), int(landmarks[17].y * h)), (0,0,255), 2)
+        cv2.line(frame,(int(landmarks[8].x * w), int(landmarks[8].y * h)), (int(landmarks[20].x * w), int(landmarks[20].y * h)), (0,255,0), 2)
+    else:
+        cv2.line(frame,(int(landmarks[5].x * w), int(landmarks[5].y * h)), (int(landmarks[17].x * w), int(landmarks[17].y * h)), (0,255,0), 2)
+        cv2.line(frame,(int(landmarks[8].x * w), int(landmarks[8].y * h)), (int(landmarks[20].x * w), int(landmarks[20].y * h)), (0,0,255), 2)
+    cv2.circle(frame, (int(landmarks[5].x * w), int(landmarks[5].y * h)), 4,(255,255,255),4)
+    cv2.circle(frame, (int(landmarks[17].x * w), int(landmarks[17].y * h)), 4,(255,255,255),4)
+    cv2.circle(frame, (int(landmarks[8].x * w), int(landmarks[8].y * h)), 4,(255,255,255),4)
+    cv2.circle(frame, (int(landmarks[20].x * w), int(landmarks[20].y * h)), 4,(255,255,255),4)
+
+def fingersClosedContour(frame, landmarks, contour):
     """ This function tries to determine if the fingers of a hand are closed or not
 
     Args:
@@ -212,12 +232,13 @@ if __name__ == "__main__":
                     maxY = max(maxY,cy)
                     #cv2.circle(frame, (cx,cy),3,(255,0,0),cv2.FILLED) #draw on every landmark
             #cv2.rectangle(frame,(minX,minY),(maxX,maxY),(255,255,0),2) #put a rectangle around the hand
-            
+            fingersClosedLM(frame, landmarks)
             margin = 20
             handPic = frame[max(minY-margin,0):min(maxY+margin,h),max(minX-margin,0):min(maxX+margin,w)] #take an image from the hand with a margin because the landmark is not on the edge of a finger
             
-            contour = contourHand(handPic, (max(minX-margin,0),max(minY-margin,0)))
-            wrist = landmarks[0] #grab wrist position for placing text there 
+            #contour = contourHand(handPic, (max(minX-margin,0),max(minY-margin,0)))
+            #wrist = landmarks[0] #grab wrist position for placing text there 
+            contour = None
             if contour is not None:
                 hull = cv2.convexHull(contour, returnPoints=False)
                 hullPts = cv2.convexHull(contour)
