@@ -13,7 +13,7 @@ def findHand(frame, handDetector, visualize=False):
         visualize: boolean that turns on visualization and draws helping points / lines to understand whats happening
 
     Returns:
-        An array with landmarks of the detected hand or None if nothing is detected.
+        An array with landmarks of the detected hand or None if nothing is detected and the label of the hand, containing the side of it
         Landmarks are indexed by:
         WRIST = 0
         THUMB_CMC = 1
@@ -40,13 +40,13 @@ def findHand(frame, handDetector, visualize=False):
     global mpDraw
     imgRGB = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) #convert input image to RGB
     results = handDetector.process(imgRGB) #run the image through the mediapipe detector
-
+    
     if results.multi_hand_landmarks is not None:
         if visualize:
             mpDraw.draw_landmarks(frame,results.multi_hand_landmarks[0],mpHands.HAND_CONNECTIONS) #draw the hand connections onto the frame. NOTE: comment this out if it is unwanted
-        return results.multi_hand_landmarks[0].landmark
+        return results.multi_hand_landmarks[0].landmark, results.multi_handedness[0].classification[0].label
     else:
-        return None
+        return None, ""
 
 def ptDist(x1, y1, x2, y2):
     """Calculates the distance between points P1 and P2
@@ -73,22 +73,36 @@ def fingersClosed(frame, landmarks, visualize = False):
     Returns:
         True if fingers are closed, False otherwise
     """
-    h, w = frame.shape[:2]
-    mcpDist = ptDist(int(landmarks[5].x * w), int(landmarks[5].y * h), int(landmarks[17].x * w), int(landmarks[17].y * h))
-    tipDist = ptDist(int(landmarks[8].x * w), int(landmarks[8].y * h), int(landmarks[20].x * w), int(landmarks[20].y * h))
-    threshold = mcpDist/3 #threshold in px to be able to control the detection 
-    if visualize:
-        if tipDist > mcpDist+threshold:
-            cv2.line(frame,(int(landmarks[5].x * w), int(landmarks[5].y * h)), (int(landmarks[17].x * w), int(landmarks[17].y * h)), (0,0,255), 2)
+    h, w = frame.shape[:2] #get the frame size
+    mcpDist = ptDist(int(landmarks[5].x * w), int(landmarks[5].y * h), int(landmarks[17].x * w), int(landmarks[17].y * h)) #get the distance between the base of index and pinky finger
+    tipDist = ptDist(int(landmarks[8].x * w), int(landmarks[8].y * h), int(landmarks[20].x * w), int(landmarks[20].y * h)) #get the distance between the tip of index and pinky finger
+    threshold = mcpDist/3 #threshold in pixel to be able to control the detection 
+    if visualize: #draw lines for the distances used. the longer one will be green
+        if tipDist > mcpDist+threshold: 
+            cv2.line(frame,(int(landmarks[5].x * w), int(landmarks[5].y * h)), (int(landmarks[17].x * w), int(landmarks[17].y * h)), (0,0,255), 2) 
             cv2.line(frame,(int(landmarks[8].x * w), int(landmarks[8].y * h)), (int(landmarks[20].x * w), int(landmarks[20].y * h)), (0,255,0), 2)
         else:
             cv2.line(frame,(int(landmarks[5].x * w), int(landmarks[5].y * h)), (int(landmarks[17].x * w), int(landmarks[17].y * h)), (0,255,0), 2)
             cv2.line(frame,(int(landmarks[8].x * w), int(landmarks[8].y * h)), (int(landmarks[20].x * w), int(landmarks[20].y * h)), (0,0,255), 2)
+        #draw circles for the points used in the calculation
         cv2.circle(frame, (int(landmarks[5].x * w), int(landmarks[5].y * h)), 2,(255,255,255),4)
         cv2.circle(frame, (int(landmarks[17].x * w), int(landmarks[17].y * h)), 2,(255,255,255),4)
         cv2.circle(frame, (int(landmarks[8].x * w), int(landmarks[8].y * h)), 2,(255,255,255),4)
         cv2.circle(frame, (int(landmarks[20].x * w), int(landmarks[20].y * h)), 2,(255,255,255),4)
-    return not tipDist > mcpDist+threshold
+    return not tipDist > mcpDist+threshold # if the distance of the tips is bigger than on the base, then the fingers are spread out, which means that they are not closed
+
+def handUp(frame, landmarks, side):
+    return 0
+
+def curState(frame,landmarks, side, visualize = False):
+    visualize = True
+    state = "undefined"
+    if landmarks is None:
+        state = "NO HAND"
+    elif fingersClosed(frame,landmarks):
+        state = "STOP"
+    #TODO andere gesten auch erkennen
+    return state
 
 mpDraw = mp.solutions.drawing_utils
 mpHands = mp.solutions.hands
@@ -108,11 +122,10 @@ if __name__ == "__main__":
         (grabbed, frame) = cam.read() #get live image from camera
         frame = cv2.flip(frame, 1) #flip the image to get mirrored view
         h, w, c = frame.shape
-        landmarks = findHand(frame, handDetector) #let mediapipe detect the hand
+        landmarks, side = findHand(frame, handDetector) #let mediapipe detect the hand
         
-        if landmarks is not None:
-            wrist = landmarks[0] #grab wrist position for placing text there 
-            cv2.putText(frame,str(fingersClosed(frame,landmarks)), (int(wrist.x*w),int(wrist.y*h)), cv2.FONT_HERSHEY_PLAIN, 3, (0,0,255), 3) #check if fingers are closed and write the result onto the wrist
+        cv2.putText(frame,curState(frame,landmarks,side), (10,140), cv2.FONT_HERSHEY_PLAIN, 3, (0,0,255), 3) #check if fingers are closed and write the result onto the wrist
+        cv2.putText(frame,side, (10,210), cv2.FONT_HERSHEY_PLAIN, 3, (0,0,255), 3) #check if fingers are closed and write the result onto the wrist
         
         #calculate fps
         cTime = time.time()
