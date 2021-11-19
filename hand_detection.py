@@ -92,15 +92,31 @@ def fingersClosed(frame, landmarks, visualize = False):
     return not tipDist > mcpDist+threshold # if the distance of the tips is bigger than on the base, then the fingers are spread out, which means that they are not closed
 
 def handUp(frame, landmarks, side):
-    return 0
+    #thumb 4 pinky 20
+    diff = landmarks[4].x - landmarks[20].x + landmarks[4].y - landmarks[20].y
+    if diff > 0:
+        if side.lower() == "right":
+            return True
+        elif side.lower() == "left":
+            return False 
+    elif diff < 0:
+        if side.lower() == "right":
+            return False
+        elif side.lower() == "left":
+            return True
+    return False #default should never occurr but i dont want it to crash if it does
 
 def curState(frame,landmarks, side, visualize = False):
     visualize = True
     state = "undefined"
     if landmarks is None:
         state = "NO HAND"
-    elif fingersClosed(frame,landmarks):
+    elif fingersClosed(frame,landmarks, visualize):
         state = "STOP"
+    elif handUp(frame,landmarks,side):
+        state = "STAND UP"
+    elif not handUp(frame,landmarks,side):
+        state = "SIT DOWN"
     #TODO andere gesten auch erkennen
     return state
 
@@ -124,7 +140,7 @@ if __name__ == "__main__":
         h, w, c = frame.shape
         landmarks, side = findHand(frame, handDetector) #let mediapipe detect the hand
         
-        cv2.putText(frame,curState(frame,landmarks,side), (10,140), cv2.FONT_HERSHEY_PLAIN, 3, (0,0,255), 3) #check if fingers are closed and write the result onto the wrist
+        cv2.putText(frame,curState(frame,landmarks,side,True), (10,140), cv2.FONT_HERSHEY_PLAIN, 3, (0,0,255), 3) #check if fingers are closed and write the result onto the wrist
         cv2.putText(frame,side, (10,210), cv2.FONT_HERSHEY_PLAIN, 3, (0,0,255), 3) #check if fingers are closed and write the result onto the wrist
         
         #calculate fps
